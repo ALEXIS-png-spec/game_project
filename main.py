@@ -56,6 +56,16 @@ def displayPauseScreen():
     screen.blit(pause_surface, (0, 0))
 
 
+def render3DText(text, font, color, x, y):
+    shadow_color = (50, 50, 50)  # Цвет для тени
+    text_surface, text_rect = createTextObject(text, font, shadow_color)
+    text_rect.topleft = (x + 2, y + 2)
+    screen.blit(text_surface, text_rect)
+    text_surface, text_rect = createTextObject(text, font, color)
+    text_rect.topleft = (x, y)
+    screen.blit(text_surface, text_rect)
+
+
 def main():
     global clock, screen, small_font, large_font
     pg.init()
@@ -69,6 +79,26 @@ def main():
         playTetris()
         displayPauseScreen()
         showInitialText('Игра закончена')
+
+
+def showGameRules():
+    screen.fill(background_color)
+    render3DText('Правила игры:', large_font, title_color, 150, 30)
+    rules = [
+        "1. Используйте стрелки для управления фигурой.",
+        "2. Нажмите 'Вверх' для поворота фигуры.",
+        "3. Нажмите 'Пробел' для паузы.",
+        "4. Нажмите 'Enter' для мгновенного падения фигуры.",
+        "5. Цель игры - заполнить ряды, чтобы они исчезли."
+    ]
+    for i, line in enumerate(rules):
+        render3DText(line, small_font, text_color, 100, 100 + i * 30)
+
+    render3DText('Нажмите любую клавишу для возвращения в меню', small_font, text_color, 100, 300)
+
+    while checkForKeyPress() is None:
+        pg.display.update()
+        clock.tick()
 
 
 def showInitialText(text):
@@ -122,6 +152,8 @@ def playTetris():
                     moving_right = False
                 elif event.key == K_DOWN:
                     moving_down = False
+                elif event.key == K_r:  # открыть правила
+                    showGameRules()
 
             elif event.type == KEYDOWN:
                 if event.key == K_LEFT and isPositionValid(game_cup, current_figure, adjX=-1):
@@ -183,6 +215,12 @@ def playTetris():
 
         # Отрисовка окна игры со всеми надписями
         screen.fill(background_color)
+        renderTitle()
+        drawCup(game_cup)
+        renderInfo(score, level)
+        renderNextFigure(next_figure)
+        if current_figure is not None:
+            renderFigure(current_figure)
         pg.display.update()
         clock.tick(frames_per_second)
 
@@ -284,6 +322,78 @@ def isLineCompleted(cup, y):
         if cup[x][y] == empty_space:
             return False
     return True
+
+def convertBlockCoords(block_x, block_y):
+    return (side_offset + (block_x * block_size)), (top_offset + (block_y * block_size))
+def drawBlockOnScreen(block_x, block_y, color, pixel_x=None, pixel_y=None):
+    if color == empty_space:
+        return
+    if pixel_x is None and pixel_y is None:
+        pixel_x, pixel_y = convertBlockCoords(block_x, block_y)
+    pg.draw.rect(screen, color_palette[color], (pixel_x + 1, pixel_y + 1, block_size - 1, block_size - 1), 0, 3)
+    pg.draw.rect(screen, light_palette[color], (pixel_x + 1, pixel_y + 1, block_size - 4, block_size - 4), 0, 3)
+    pg.draw.circle(screen, color_palette[color], (pixel_x + block_size / 2, pixel_y + block_size / 2), 5)
+
+
+def drawCup(cup):
+    pg.draw.rect(screen, border_color, (side_offset - 4, top_offset - 4, (cup_width * block_size) + 8, (cup_height * block_size) + 8), 5)
+    pg.draw.rect(screen, background_color, (side_offset, top_offset, block_size * cup_width, block_size * cup_height))
+    for x in range(cup_width):
+        for y in range(cup_height):
+            drawBlockOnScreen(x, y, cup[x][y])
+
+
+def renderTitle():
+    render3DText('Block Breakers', large_font, title_color, screen_width - 425, 30)
+
+
+def renderInfo(points, level):
+    points_surface = small_font.render(f'Баллы: {points}', True, text_color)
+    points_rect = points_surface.get_rect()
+    points_rect.topleft = (screen_width - 550, 180)
+    screen.blit(points_surface, points_rect)
+
+    level_surface = small_font.render(f'Уровень: {level}', True, text_color)
+    level_rect = level_surface.get_rect()
+    level_rect.topleft = (screen_width - 550, 250)
+    screen.blit(level_surface, level_rect)
+
+    pause_surface = small_font.render('Пауза: пробел', True, info_color)
+    pause_rect = pause_surface.get_rect()
+    pause_rect.topleft = (screen_width - 550, 420)
+    screen.blit(pause_surface, pause_rect)
+
+    exit_surface = small_font.render('Выход: Esc', True, info_color)
+    exit_rect = exit_surface.get_rect()
+    exit_rect.topleft = (screen_width - 550, 450)
+    screen.blit(exit_surface, exit_rect)
+
+
+def renderFigure(fig, pixel_x=None, pixel_y=None):
+    figure_to_draw = shapes[fig['shape']][fig['rotation']]
+    if pixel_x is None and pixel_y is None:
+        pixel_x, pixel_y = convertBlockCoords(fig['x'], fig['y'])
+
+    for x in range(figure_width):
+        for y in range(figure_height):
+            if figure_to_draw[y][x] != empty_space:
+                pg.draw.rect(screen, color_palette[fig['color']],
+                             (pixel_x + (x * block_size), pixel_y + (y * block_size), block_size, block_size))
+
+
+def renderNextFigure(fig):
+    next_surface = small_font.render('Следующая:', True, text_color)
+    next_rect = next_surface.get_rect()
+    next_rect.topleft = (screen_width - 150, 180)
+    screen.blit(next_surface, next_rect)
+    renderFigure(fig, pixel_x=screen_width - 150, pixel_y=230)
+
+
+def drawBackground():
+    for x in range(0, screen_width, block_size):
+        for y in range(0, screen_height, block_size):
+            color = random.choice(color_palette)
+            pg.draw.rect(screen, color, (x, y, block_size, block_size))
 
 
 if __name__ == '__main__':
