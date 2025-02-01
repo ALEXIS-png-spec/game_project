@@ -101,21 +101,6 @@ def showGameRules():
         clock.tick()
 
 
-def showInitialText(text):
-    title_surface, title_rect = createTextObject(text, large_font, title_color)
-    title_rect.center = (int(screen_width / 2) - 3, int(screen_height / 2) - 3)
-    screen.blit(title_surface, title_rect)
-
-    press_key_surface, press_key_rect = createTextObject('Нажмите любую клавишу для продолжения', small_font,
-                                                         title_color)
-    press_key_rect.center = (int(screen_width / 2), int(screen_height / 2) + 100)
-    screen.blit(press_key_surface, press_key_rect)
-
-    while checkForKeyPress() is None:
-        pg.display.update()
-        clock.tick()
-
-
 def playTetris():
     game_cup = createEmptyCup()
     last_move_down_time = time.time()
@@ -245,6 +230,21 @@ def checkForKeyPress():
     return None
 
 
+def showInitialText(text):
+    title_surface, title_rect = createTextObject(text, large_font, title_color)
+    title_rect.center = (int(screen_width / 2) - 3, int(screen_height / 2) - 3)
+    screen.blit(title_surface, title_rect)
+
+    press_key_surface, press_key_rect = createTextObject('Нажмите любую клавишу для продолжения', small_font,
+                                                         title_color)
+    press_key_rect.center = (int(screen_width / 2), int(screen_height / 2) + 100)
+    screen.blit(press_key_surface, press_key_rect)
+
+    while checkForKeyPress() is None:
+        pg.display.update()
+        clock.tick()
+
+
 def handleQuit():
     for event in pg.event.get(QUIT):
         terminateGame()
@@ -252,6 +252,12 @@ def handleQuit():
         if event.key == K_ESCAPE:
             terminateGame()
         pg.event.post(event)
+
+
+def calculateSpeed(points):
+    level = int(points / 10) + 1
+    fall_speed = 0.27 - (level * 0.02)
+    return level, fall_speed
 
 
 def generateNewFigure():
@@ -264,11 +270,22 @@ def generateNewFigure():
     return new_figure
 
 
+def addFigureToCup(cup, fig):
+    for x in range(figure_width):
+        for y in range(figure_height):
+            if shapes[fig['shape']][fig['rotation']][y][x] != empty_space:
+                cup[x + fig['x']][y + fig['y']] = fig['color']
+
+
 def createEmptyCup():
     cup = []
     for i in range(cup_width):
         cup.append([empty_space] * cup_height)
     return cup
+
+
+def isInCup(x, y):
+    return x >= 0 and x < cup_width and y < cup_height
 
 
 def isPositionValid(cup, fig, adjX=0, adjY=0):
@@ -284,21 +301,11 @@ def isPositionValid(cup, fig, adjX=0, adjY=0):
     return True
 
 
-def calculateSpeed(points):
-    level = int(points / 10) + 1
-    fall_speed = 0.27 - (level * 0.02)
-    return level, fall_speed
-
-
-def addFigureToCup(cup, fig):
-    for x in range(figure_width):
-        for y in range(figure_height):
-            if shapes[fig['shape']][fig['rotation']][y][x] != empty_space:
-                cup[x + fig['x']][y + fig['y']] = fig['color']
-
-
-def isInCup(x, y):
-    return x >= 0 and x < cup_width and y < cup_height
+def isLineCompleted(cup, y):
+    for x in range(cup_width):
+        if cup[x][y] == empty_space:
+            return False
+    return True
 
 
 def clearFullLines(cup):
@@ -317,14 +324,10 @@ def clearFullLines(cup):
     return removed_lines
 
 
-def isLineCompleted(cup, y):
-    for x in range(cup_width):
-        if cup[x][y] == empty_space:
-            return False
-    return True
-
 def convertBlockCoords(block_x, block_y):
     return (side_offset + (block_x * block_size)), (top_offset + (block_y * block_size))
+
+
 def drawBlockOnScreen(block_x, block_y, color, pixel_x=None, pixel_y=None):
     if color == empty_space:
         return
@@ -336,7 +339,8 @@ def drawBlockOnScreen(block_x, block_y, color, pixel_x=None, pixel_y=None):
 
 
 def drawCup(cup):
-    pg.draw.rect(screen, border_color, (side_offset - 4, top_offset - 4, (cup_width * block_size) + 8, (cup_height * block_size) + 8), 5)
+    pg.draw.rect(screen, border_color,
+                 (side_offset - 4, top_offset - 4, (cup_width * block_size) + 8, (cup_height * block_size) + 8), 5)
     pg.draw.rect(screen, background_color, (side_offset, top_offset, block_size * cup_width, block_size * cup_height))
     for x in range(cup_width):
         for y in range(cup_height):
@@ -394,6 +398,29 @@ def drawBackground():
         for y in range(0, screen_height, block_size):
             color = random.choice(color_palette)
             pg.draw.rect(screen, color, (x, y, block_size, block_size))
+
+
+def showInitialText(text):
+    screen.fill(background_color)
+    drawBackground()
+
+    text_background = pg.Surface((400, 100))
+    text_background.set_alpha(150)
+    text_background.fill((0, 0, 0))
+    screen.blit(text_background, (int(screen_width / 2) - 200, int(screen_height / 2) - 50))
+
+    title_surface, title_rect = createTextObject(text, large_font, title_color)
+    title_rect.center = (int(screen_width / 2), int(screen_height / 2) - 30)
+    screen.blit(title_surface, title_rect)
+
+    press_key_surface, press_key_rect = createTextObject('Нажмите любую клавишу для продолжения', small_font,
+                                                         text_color)
+    press_key_rect.center = (int(screen_width / 2), int(screen_height / 2) + 50)
+    screen.blit(press_key_surface, press_key_rect)
+
+    while checkForKeyPress() is None:
+        pg.display.update()
+        clock.tick()
 
 
 if __name__ == '__main__':
