@@ -7,7 +7,7 @@ from pygame.locals import *
 
 # Настройки
 frames_per_second = 25
-screen_width, screen_height = 600, 500
+screen_width, screen_height = 800, 500
 block_size, cup_height, cup_width = 20, 20, 10
 
 side_move_freq, downward_move_freq = 0.15, 0.1  # передвижение в сторону и вниз
@@ -21,7 +21,7 @@ light_palette = ((30, 30, 255), (50, 255, 50), (255, 30, 30),
 
 white, gray, black = (255, 255, 255), (185, 185, 185), (0, 0, 0)
 border_color, background_color, text_color, title_color, info_color = white, black, white, color_palette[3], \
-color_palette[0]
+    color_palette[0]
 
 figure_width, figure_height = 5, 5
 empty_space = 'o'
@@ -49,11 +49,21 @@ shapes = {
           ['ooooo', 'ooxoo', 'oxxoo', 'ooxoo', 'ooooo']]
 }
 
+score_table = []  # Это будет список ваших рекордов
+
 
 def displayPauseScreen():
     pause_surface = pg.Surface((600, 500), pg.SRCALPHA)
     pause_surface.fill((0, 0, 255, 127))
     screen.blit(pause_surface, (0, 0))
+
+
+def draw_score_button(is_clicked=False):
+    """Рисует кнопку для открытия таблицы рекордов."""
+    button_rect = pg.Rect(screen_width - 200, 100, 200, 50)
+    button_color = (0, 200, 0) if not is_clicked else (0, 255, 0)  # Зелёный цвет, меняется при нажатии
+    pg.draw.rect(screen, button_color, button_rect)  # Зеленая кнопка
+    render3DText('Таблица рекордов', small_font, white, button_rect.x + 10, button_rect.y + 10)
 
 
 def render3DText(text, font, color, x, y):
@@ -66,15 +76,52 @@ def render3DText(text, font, color, x, y):
     screen.blit(text_surface, text_rect)
 
 
+def load_sprites():
+    global block_image, background_image
+    # Загрузите изображения
+    block_image = pg.image.load('block.png.jpg').convert_alpha()
+    background_image = pg.image.load('background.png.jpg').convert()
+
+    # Измените размер изображений
+    block_image = pg.transform.scale(block_image, (20, 20))  # Укажите нужный размер
+    background_image = pg.transform.scale(background_image, (800, 600))  # Укажите нужный размер
+
+
+def show_score_table():
+    """Отображает таблицу рекордов."""
+    screen.fill(background_color)  # Заливаем экран фоном
+    render3DText('Таблица рекордов:', large_font, title_color, 150, 30)
+
+    # Проверка, есть ли записи в таблице
+    if not score_table:
+        render3DText('Нет рекордов', small_font, text_color, 100, 100)
+    else:
+        for i, score in enumerate(score_table):
+            render3DText(f'{i + 1}. {score}', small_font, text_color, 100, 100 + i * 30)
+
+    render3DText('Нажмите любую клавишу для возвращения в меню', small_font, text_color, 100, 300)
+
+    while checkForKeyPress() is None:
+        pg.display.update()  # Обновляем экран
+        clock.tick()
+
+
 def main():
     global clock, screen, small_font, large_font
     pg.init()
+
+    # Установка режима отображения перед загрузкой изображений
+    screen = pg.display.set_mode((800, 600))  # Установите нужные вам размеры окна
+    pg.display.set_caption('Block Breakers')
+
+    load_sprites()  # Теперь можно загружать спрайты
+
     clock = pg.time.Clock()
-    screen = pg.display.set_mode((screen_width, screen_height))
     small_font = pg.font.SysFont('arial', 20)
     large_font = pg.font.SysFont('verdana', 45)
-    pg.display.set_caption('Block Breakers')
+
     showInitialText('Block Breakers')
+
     while True:
         playTetris()
         displayPauseScreen()
@@ -101,6 +148,20 @@ def showGameRules():
         clock.tick()
 
 
+def draw_save_button(is_clicked=False):
+    """Рисует кнопку для сохранения результатов игры."""
+    button_rect = pg.Rect(screen_width - 200, screen_height - 100, 200, 50)
+    button_color = (200, 0, 0) if not is_clicked else (255, 0, 0)  # Красный цвет, меняется при нажатии
+    pg.draw.rect(screen, button_color, button_rect)  # Красная кнопка
+    render3DText('Сохранить результат', small_font, white, button_rect.x + 10, button_rect.y + 10)
+
+
+def save_score(score):
+    """Сохраняет результат в файл."""
+    with open('scores.txt', 'a') as file:
+        file.write(f'{score}\n')
+
+
 def playTetris():
     game_cup = createEmptyCup()
     last_move_down_time = time.time()
@@ -114,6 +175,10 @@ def playTetris():
     current_figure = generateNewFigure()
     next_figure = generateNewFigure()
 
+    # Button click state management
+    score_button_clicked = False
+    save_button_clicked = False
+
     while True:
         if current_figure is None:
             current_figure = next_figure
@@ -121,7 +186,9 @@ def playTetris():
             last_fall_time = time.time()
 
             if not isPositionValid(game_cup, current_figure):
+                game_over(score)  # Вызов функции завершения игры
                 return  # Игра закончена
+
         handleQuit()
         for event in pg.event.get():
             if event.type == KEYUP:
@@ -174,6 +241,19 @@ def playTetris():
                             break
                     current_figure['y'] += i - 1
 
+            elif event.type == MOUSEBUTTONDOWN:
+                if event.button == 1:  # Левый клик мыши
+                    mouse_x, mouse_y = event.pos
+                    # Проверка нажатия кнопки "Таблица рекордов"
+                    if (screen_width - 200 <= mouse_x <= screen_width - 10) and (100 <= mouse_y <= 150):
+                        score_button_clicked = True
+                        show_score_table()  # Показываем таблицу рекордов
+                    # Проверка нажатия кнопки "Сохранить результат"
+                    elif (screen_width - 200 <= mouse_x <= screen_width - 10) and (
+                            screen_height - 100 <= mouse_y <= screen_height - 50):
+                        save_button_clicked = True
+                        save_score(score)  # Сохраняем результат игры
+
         # Управление падением фигуры при удержании клавиш
         if (moving_left or moving_right) and time.time() - last_side_move_time > side_move_freq:
             if moving_left and isPositionValid(game_cup, current_figure, adjX=-1):
@@ -198,16 +278,25 @@ def playTetris():
                 current_figure['y'] += 1
                 last_fall_time = time.time()
 
-        # Отрисовка окна игры со всеми надписями
-        screen.fill(background_color)
-        renderTitle()
-        drawCup(game_cup)
-        renderInfo(score, level)
-        renderNextFigure(next_figure)
-        if current_figure is not None:
-            renderFigure(current_figure)
-        pg.display.update()
-        clock.tick(frames_per_second)
+                # Отрисовка окна игры со всеми надписями
+                screen.fill(background_color)
+                renderTitle()
+                drawCup(game_cup)
+                renderInfo(score, level)
+                renderNextFigure(next_figure)
+                if current_figure is not None:
+                    renderFigure(current_figure)
+
+                # Draw buttons with click animation
+                draw_score_button(is_clicked=score_button_clicked)
+                draw_save_button(is_clicked=save_button_clicked)
+
+                pg.display.update()
+                clock.tick(frames_per_second)
+
+                # Reset button click states after drawing
+                score_button_clicked = False
+                save_button_clicked = False
 
 
 def createTextObject(text, font, color):
@@ -333,9 +422,7 @@ def drawBlockOnScreen(block_x, block_y, color, pixel_x=None, pixel_y=None):
         return
     if pixel_x is None and pixel_y is None:
         pixel_x, pixel_y = convertBlockCoords(block_x, block_y)
-    pg.draw.rect(screen, color_palette[color], (pixel_x + 1, pixel_y + 1, block_size - 1, block_size - 1), 0, 3)
-    pg.draw.rect(screen, light_palette[color], (pixel_x + 1, pixel_y + 1, block_size - 4, block_size - 4), 0, 3)
-    pg.draw.circle(screen, color_palette[color], (pixel_x + block_size / 2, pixel_y + block_size / 2), 5)
+    screen.blit(block_image, (pixel_x, pixel_y))
 
 
 def drawCup(cup):
@@ -354,22 +441,22 @@ def renderTitle():
 def renderInfo(points, level):
     points_surface = small_font.render(f'Баллы: {points}', True, text_color)
     points_rect = points_surface.get_rect()
-    points_rect.topleft = (screen_width - 550, 180)
+    points_rect.topleft = (screen_width - 700, 180)
     screen.blit(points_surface, points_rect)
 
     level_surface = small_font.render(f'Уровень: {level}', True, text_color)
     level_rect = level_surface.get_rect()
-    level_rect.topleft = (screen_width - 550, 250)
+    level_rect.topleft = (screen_width - 700, 250)
     screen.blit(level_surface, level_rect)
 
     pause_surface = small_font.render('Пауза: пробел', True, info_color)
     pause_rect = pause_surface.get_rect()
-    pause_rect.topleft = (screen_width - 550, 420)
+    pause_rect.topleft = (screen_width - 700, 420)
     screen.blit(pause_surface, pause_rect)
 
     exit_surface = small_font.render('Выход: Esc', True, info_color)
     exit_rect = exit_surface.get_rect()
-    exit_rect.topleft = (screen_width - 550, 450)
+    exit_rect.topleft = (screen_width - 700, 450)
     screen.blit(exit_surface, exit_rect)
 
 
@@ -394,10 +481,7 @@ def renderNextFigure(fig):
 
 
 def drawBackground():
-    for x in range(0, screen_width, block_size):
-        for y in range(0, screen_height, block_size):
-            color = random.choice(color_palette)
-            pg.draw.rect(screen, color, (x, y, block_size, block_size))
+    screen.blit(background_image, (0, 0))
 
 
 def showInitialText(text):
@@ -421,6 +505,33 @@ def showInitialText(text):
     while checkForKeyPress() is None:
         pg.display.update()
         clock.tick()
+
+
+def animate_fall(fig):
+    original_y = fig['y']
+    for i in range(5):
+        fig['y'] += 1 if i % 2 == 0 else -1  # Двигаться вниз и вверх
+        renderFigure(fig)
+        pg.display.update()
+        pg.time.delay(50)
+    fig['y'] = original_y + 1  # Установить на конечную позицию после анимации
+
+
+def flash_block(block_x, block_y, color):
+    original_color = color_palette[color]
+    flash_color = (255, 255, 255)  # Белый цвет для мигания
+    drawBlockOnScreen(block_x, block_y, flash_color)
+    pg.display.update()
+    pg.time.delay(100)
+    drawBlockOnScreen(block_x, block_y, original_color)
+
+
+def game_over(score):
+    global score_table
+    score_table.append(score)
+    score_table.sort(reverse=True)  # Сортируем от большего к меньшему
+    if len(score_table) > 10:  # Ограничиваем количество рекордов
+        score_table = score_table[:10]
 
 
 if __name__ == '__main__':
