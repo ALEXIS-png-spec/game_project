@@ -130,7 +130,7 @@ def main():
 
 def showGameRules():
     screen.fill(background_color)
-    render3DText('Правила игры:', large_font, title_color, 150, 30)
+    render3DText('Правила игры:', large_font, title_color, 225, 30)
     rules = [
         "1. Используйте стрелки для управления фигурой.",
         "2. Нажмите 'Вверх' для поворота фигуры.",
@@ -139,9 +139,9 @@ def showGameRules():
         "5. Цель игры - заполнить ряды, чтобы они исчезли."
     ]
     for i, line in enumerate(rules):
-        render3DText(line, small_font, text_color, 100, 100 + i * 30)
+        render3DText(line, small_font, text_color, 225, 100 + i * 30)
 
-    render3DText('Нажмите любую клавишу для возвращения в меню', small_font, text_color, 100, 300)
+    render3DText('Нажмите любую клавишу для возвращения в меню', small_font, text_color, 225, 300)
 
     while checkForKeyPress() is None:
         pg.display.update()
@@ -435,7 +435,7 @@ def drawCup(cup):
 
 
 def renderTitle():
-    render3DText('Block Breakers', large_font, title_color, screen_width - 425, 30)
+    render3DText('Block Breakers', large_font, title_color, screen_width - 550, 30)
 
 
 def renderInfo(points, level):
