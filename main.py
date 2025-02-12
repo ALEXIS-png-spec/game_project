@@ -51,6 +51,20 @@ shapes = {
 
 score_table = []  # Это будет список ваших рекордов
 
+player_name = None
+
+def draw_reset_scores_button(is_clicked=False):
+    """Рисует кнопку для сброса таблицы рекордов."""
+    button_rect = pg.Rect(10, 160, 200, 50)  # Позиция ниже кнопки "Изменить фон"
+    button_color = (200, 0, 0) if not is_clicked else (255, 0, 0)  # Красный цвет, меняется при нажатии
+    pg.draw.rect(screen, button_color, button_rect)  # Красная кнопка
+    render3DText('Сброс рекордов', small_font, white, button_rect.x + 10, button_rect.y + 10)
+
+def reset_scores():
+    global score_table
+    score_table = []  # Очищаем таблицу рекордов
+
+score_reset_button_clicked = False
 
 def displayPauseScreen():
     pause_surface = pg.Surface((600, 500), pg.SRCALPHA)
@@ -65,6 +79,13 @@ def draw_score_button(is_clicked=False):
     pg.draw.rect(screen, button_color, button_rect)  # Зеленая кнопка
     render3DText('Таблица рекордов', small_font, white, button_rect.x + 10, button_rect.y + 10)
 
+def draw_sound_button(is_playing=False):
+    """Рисует кнопку для переключения звука."""
+    button_rect = pg.Rect(10, 100, 200, 50)  # Позиция кнопки
+    button_color = (0, 200, 0) if is_playing else (200, 0, 0)  # Зеленый, если звук включен, красный, если выключен
+    pg.draw.rect(screen, button_color, button_rect)  # Рисуем кнопку
+    text = 'Звук: Включен' if is_playing else 'Звук: Выключен'
+    render3DText(text, small_font, white, button_rect.x + 10, button_rect.y + 10)
 
 def render3DText(text, font, color, x, y):
     shadow_color = (50, 50, 50)  # Цвет для тени
@@ -77,10 +98,13 @@ def render3DText(text, font, color, x, y):
 
 
 def load_sprites():
-    global block_image, background_image
+    global block_image, background_image, sound_effect
     # Загрузите изображения
     block_image = pg.image.load('block.png.jpg').convert_alpha()
     background_image = pg.image.load('background.png.jpg').convert()
+
+    # Загружаем звук
+    sound_effect = pg.mixer.Sound('sound.mp3')
 
     # Измените размер изображений
     block_image = pg.transform.scale(block_image, (20, 20))  # Укажите нужный размер
@@ -89,20 +113,19 @@ def load_sprites():
 
 def show_score_table():
     """Отображает таблицу рекордов."""
-    screen.fill(background_color)  # Заливаем экран фоном
+    screen.fill(background_color)
     render3DText('Таблица рекордов:', large_font, title_color, 150, 30)
 
-    # Проверка, есть ли записи в таблице
     if not score_table:
         render3DText('Нет рекордов', small_font, text_color, 100, 100)
     else:
-        for i, score in enumerate(score_table):
-            render3DText(f'{i + 1}. {score}', small_font, text_color, 100, 100 + i * 30)
+        for i, (name, score) in enumerate(score_table):
+            render3DText(f'{i + 1}. {name}: {score}', small_font, text_color, 100, 100 + i * 30)
 
     render3DText('Нажмите любую клавишу для возвращения в меню', small_font, text_color, 100, 300)
 
     while checkForKeyPress() is None:
-        pg.display.update()  # Обновляем экран
+        pg.display.update()
         clock.tick()
 
 
@@ -122,10 +145,13 @@ def main():
 
     showInitialText('Block Breakers')
 
+    start_game()  # Переносим вызов сюда, чтобы он был после инициализации
+
     while True:
         playTetris()
         displayPauseScreen()
         showInitialText('Игра закончена')
+
 
 
 def showGameRules():
@@ -156,13 +182,16 @@ def draw_save_button(is_clicked=False):
     render3DText('Сохранить результат', small_font, white, button_rect.x + 10, button_rect.y + 10)
 
 
-def save_score(score):
-    """Сохраняет результат в файл."""
+def save_score(name, score):
+    """Сохраняет имя игрока и его балл в файл."""
     with open('scores.txt', 'a') as file:
-        file.write(f'{score}\n')
+        file.write(f'{name}: {score}\n')
 
 
 def playTetris():
+    global score_reset_button_clicked, sound_playing  # Объявляем переменную как глобальную
+    score_reset_button_clicked = False  # Для отслеживания, нажата ли кнопка сброса
+    sound_playing = False
     game_cup = createEmptyCup()
     last_move_down_time = time.time()
     last_side_move_time = time.time()
@@ -241,6 +270,7 @@ def playTetris():
                             break
                     current_figure['y'] += i - 1
 
+
             elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:  # Левый клик мыши
                     mouse_x, mouse_y = event.pos
@@ -252,7 +282,16 @@ def playTetris():
                     elif (screen_width - 200 <= mouse_x <= screen_width - 10) and (
                             screen_height - 100 <= mouse_y <= screen_height - 50):
                         save_button_clicked = True
-                        save_score(score)  # Сохраняем результат игры
+                        save_score(player_name, score)  # Передаем имя игрока и сохраняем результат
+                    elif (10 <= mouse_x <= 210) and (160 <= mouse_y <= 210):
+                        reset_scores()  # Сбрасываем таблицу рекордов
+                        score_reset_button_clicked = True  # Указываем, что кнопка была нажата
+                    if (10 <= mouse_x <= 210) and (100 <= mouse_y <= 150):
+                        sound_playing = not sound_playing  # Переключаем состояние звука
+                        if sound_playing:
+                            sound_effect.play(-1)  # Воспроизводим звук в цикле
+                        else:
+                            sound_effect.stop()
 
         # Управление падением фигуры при удержании клавиш
         if (moving_left or moving_right) and time.time() - last_side_move_time > side_move_freq:
@@ -286,6 +325,8 @@ def playTetris():
                 renderNextFigure(next_figure)
                 if current_figure is not None:
                     renderFigure(current_figure)
+                draw_sound_button(is_playing=sound_playing)
+                draw_reset_scores_button(is_clicked=score_reset_button_clicked)
 
                 # Draw buttons with click animation
                 draw_score_button(is_clicked=score_button_clicked)
@@ -297,6 +338,9 @@ def playTetris():
                 # Reset button click states after drawing
                 score_button_clicked = False
                 save_button_clicked = False
+                score_button_clicked = False
+                save_button_clicked = False
+                score_reset_button_clicked = False
 
 
 def createTextObject(text, font, color):
@@ -525,13 +569,59 @@ def flash_block(block_x, block_y, color):
     pg.time.delay(100)
     drawBlockOnScreen(block_x, block_y, original_color)
 
-
 def game_over(score):
     global score_table
-    score_table.append(score)
-    score_table.sort(reverse=True)  # Сортируем от большего к меньшему
-    if len(score_table) > 10:  # Ограничиваем количество рекордов
-        score_table = score_table[:10]
+    # Здесь вы можете добавить логику для завершения игры
+    if player_name is not None:  # Убедитесь, что имя игрока введено
+        score_table.append((player_name, score))  # Добавляем как кортеж (имя, балл)
+        score_table.sort(key=lambda x: x[1], reverse=True)  # Сортируем по баллам
+        if len(score_table) > 10:  # Ограничиваем до 10 лучших результатов
+            score_table = score_table[:10]
+
+def get_player_name():
+    global small_font  # Объявляем small_font как глобальную переменную
+    input_box = pg.Rect(300, 250, 140, 32)
+    color_inactive = pg.Color('lightskyblue3')
+    color_active = pg.Color('dodgerblue2')
+    color = color_inactive
+    text = ''
+    active = True  # Сразу активируем поле ввода
+
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                terminateGame()
+            if event.type == pg.MOUSEBUTTONDOWN:
+                if input_box.collidepoint(event.pos):
+                    active = not active
+                else:
+                    active = False
+                color = color_active if active else color_inactive
+            if event.type == pg.KEYDOWN:
+                if active:
+                    if event.key == pg.K_RETURN and text:  # Проверяем, что текст не пуст
+                        return text  # Возвращаем имя игрока
+                    elif event.key == pg.K_BACKSPACE:
+                        text = text[:-1]
+                    else:
+                        text += event.unicode
+
+        screen.fill(background_color)
+        txt_surface = small_font.render(text, True, color)  # Используем глобальную переменную
+        width = max(200, txt_surface.get_width() + 10)
+        input_box.w = width
+        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
+        pg.draw.rect(screen, color, input_box, 2)
+        render3DText('Введите ваше имя:', large_font, title_color, 150, 200)  # Подсказка для ввода
+        pg.display.flip()
+        clock.tick(30)
+
+
+
+def start_game():
+    global player_name  # Объявляем player_name как глобальную переменную
+    if player_name is None:  # Проверяем, было ли уже введено имя
+        player_name = get_player_name()  # Запрашиваем имя игрока перед началом игры
 
 
 if __name__ == '__main__':
