@@ -53,6 +53,9 @@ score_table = []  # Это будет список ваших рекордов
 
 player_name = None
 
+songs = ['sound.mp3', 'sound2.mp3', 'sound3.mp3']
+current_song_index = 0
+
 def draw_reset_scores_button(is_clicked=False):
     """Рисует кнопку для сброса таблицы рекордов."""
     button_rect = pg.Rect(10, 160, 200, 50)  # Позиция ниже кнопки "Изменить фон"
@@ -85,7 +88,15 @@ def draw_sound_button(is_playing=False):
     button_color = (0, 200, 0) if is_playing else (200, 0, 0)  # Зеленый, если звук включен, красный, если выключен
     pg.draw.rect(screen, button_color, button_rect)  # Рисуем кнопку
     text = 'Звук: Включен' if is_playing else 'Звук: Выключен'
-    render3DText(text, small_font, white, button_rect.x + 10, button_rect.y + 10)
+    current_song_name = songs[current_song_index].split('/')[-1]  # Получаем имя текущей песни
+    render3DText(f'{text} - {current_song_name}', small_font, white, button_rect.x + 10, button_rect.y + 10)
+
+def play_next_song():
+    global current_song_index
+    pg.mixer.music.load(songs[current_song_index])
+    pg.mixer.music.play(-1)  # Воспроизводим в цикле
+    current_song_index = (current_song_index + 1) % len(songs)  # Переход к следующей песне
+
 
 def render3DText(text, font, color, x, y):
     shadow_color = (50, 50, 50)  # Цвет для тени
@@ -289,9 +300,9 @@ def playTetris():
                     if (10 <= mouse_x <= 210) and (100 <= mouse_y <= 150):
                         sound_playing = not sound_playing  # Переключаем состояние звука
                         if sound_playing:
-                            sound_effect.play(-1)  # Воспроизводим звук в цикле
+                            play_next_song()  # Воспроизводим следующую песню
                         else:
-                            sound_effect.stop()
+                            pg.mixer.music.stop()  # Останавливаем музыку
 
         # Управление падением фигуры при удержании клавиш
         if (moving_left or moving_right) and time.time() - last_side_move_time > side_move_freq:
